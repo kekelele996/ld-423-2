@@ -21,7 +21,7 @@ export const standardDeviation = (values: number[]) => {
 };
 
 export const calculateStatSummary = (datasetId: string, rows: DatasetRow[], fieldName: string): StatSummary => {
-  const values = rows.map((row) => Number(row[fieldName])).filter((value) => Number.isFinite(value));
+  const values = rows.map((row) => row[fieldName]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
   const nullCount = rows.filter((row) => row[fieldName] === null || row[fieldName] === undefined || row[fieldName] === '').length;
   if (values.length === 0) {
     return { datasetId, fieldName, mean: 0, median: 0, standardDeviation: 0, min: 0, max: 0, quartiles: { q1: 0, q2: 0, q3: 0 }, nullCount };

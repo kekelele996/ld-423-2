@@ -21,5 +21,5 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     }),
   updateFilter: (filter) => set({ filters: get().filters.map((candidate) => (candidate.id === filter.id ? filter : candidate)) }),
   removeFilter: (filterId) => set({ filters: get().filters.filter((filter) => filter.id !== filterId) }),
-  toggleFilter: (filterId) => set({ filters: get().filters.filter((filter) => filter.id !== filterId) }),
+  toggleFilter: (filterId) => set({ filters: get().filters.map((filter) => (filter.id === filterId ? { ...filter, active: !filter.active } : filter)) }),
 }));

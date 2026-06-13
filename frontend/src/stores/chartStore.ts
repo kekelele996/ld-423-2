@@ -31,6 +31,7 @@ export const useChartStore = create<ChartState>((set, get) => ({
   selectChart: (chartId) => set({ selectedChartId: chartId }),
   removeChart: async (chartId) => {
     await db.charts.delete(chartId);
-    set({ charts: get().charts.filter((chart) => chart.id !== chartId), selectedChartId: chartId });
+    const remaining = get().charts.filter((chart) => chart.id !== chartId);
+    set({ charts: remaining, selectedChartId: remaining[0]?.id ?? '' });
   },
 }));

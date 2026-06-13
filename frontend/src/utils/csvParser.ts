@@ -14,7 +14,7 @@ const coerceValue = (value: unknown): string | number | boolean | null => {
 export const inferDataType = (values: unknown[]): DataType => {
   const nonEmpty = values.filter((value) => value !== null && value !== undefined && value !== '');
   if (nonEmpty.length === 0) return DataType.String;
-  if (values.every((value) => typeof coerceValue(value) === 'number')) return DataType.Number;
+  if (nonEmpty.every((value) => typeof coerceValue(value) === 'number')) return DataType.Number;
   if (nonEmpty.every((value) => /^(true|false)$/i.test(String(value)))) return DataType.Boolean;
   if (nonEmpty.every((value) => !Number.isNaN(Date.parse(String(value))))) return DataType.Date;
   return DataType.String;
