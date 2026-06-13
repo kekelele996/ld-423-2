@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { DataType } from '../types';
 import { DataGrid } from '../components/common/DataGrid';
 import { FilterPanel } from '../components/common/FilterPanel';
 import { EmptyState } from '../components/common/EmptyState';
 import { useDataImport } from '../hooks/useDataImport';
 import { useDatasetStore } from '../stores/datasetStore';
+import { useFilterStore } from '../stores/filterStore';
+import { applyFilters } from '../utils/filterUtils';
 
 export const Workspace = () => {
   const { importFile, error } = useDataImport();
@@ -14,7 +16,12 @@ export const Workspace = () => {
   const addDataset = useDatasetStore((state) => state.addDataset);
   const selectDataset = useDatasetStore((state) => state.selectDataset);
   const updateColumnType = useDatasetStore((state) => state.updateColumnType);
+  const allFilters = useFilterStore((state) => state.filters);
   const dataset = datasets.find((candidate) => candidate.id === selectedDatasetId);
+  const filteredRows = useMemo(() => {
+    if (!dataset) return [];
+    return applyFilters(dataset.data, allFilters.filter((filter) => filter.datasetId === dataset.id), dataset.columns);
+  }, [dataset, allFilters]);
 
   useEffect(() => {
     void loadDatasets();
@@ -65,7 +72,7 @@ export const Workspace = () => {
                 </label>
               ))}
             </div>
-            <DataGrid rows={dataset.data} columns={dataset.columns} />
+            <DataGrid rows={filteredRows} columns={dataset.columns} />
           </section>
           <FilterPanel datasetId={dataset.id} />
         </div>
