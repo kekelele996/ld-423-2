@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { DataType, FilterOperator } from './frontend/src/types/enums';
 import type { ColumnDefinition, DatasetRow, Filter } from './frontend/src/types';
-import { applyFilters } from './frontend/src/utils/filterUtils';
+import { applyFilters, isFilterValid } from './frontend/src/utils/filterUtils';
 
 const columns: ColumnDefinition[] = [
   { name: 'day', type: DataType.Number },
@@ -107,9 +107,9 @@ const cases: TestCase[] = [
     expectedCount: 8,
   },
   {
-    name: '分组 Equals 空字符串不应匹配到任何行 (空值/空串直接返回 false)',
+    name: '分组 Equals 空字符串 => 条件无效被忽略，返回全量 (新行为：未填完整的条件不参与过滤)',
     filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.Equals, value: '' })],
-    expectedCount: 0,
+    expectedCount: 9,
   },
   {
     name: 'Between 数值数组格式 [0.2, 0.5] => 3 条',
@@ -121,10 +121,89 @@ const cases: TestCase[] = [
     filters: [mkFilter({ fieldName: 'temperature', operator: FilterOperator.Equals, value: 37 })],
     expectedCount: 5,
   },
+  // ============== 新增筛选器 & 空值条件 相关用例 ==============
+  {
+    name: '新增筛选器默认状态 (active=false, value=\'\') => 全量数据',
+    filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.Equals, value: '', active: false })],
+    expectedCount: 9,
+  },
+  {
+    name: 'active=true 但 value 为空字符串 => 无效条件被忽略，返回全量',
+    filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.Equals, value: '', active: true })],
+    expectedCount: 9,
+  },
+  {
+    name: 'active=true 但 Between 只填了最小值 (缺最大值) => 无效，返回全量',
+    filters: [mkFilter({ fieldName: 'od600', operator: FilterOperator.Between, value: '0.5', active: true })],
+    expectedCount: 9,
+  },
+  {
+    name: 'active=true 但 In 为空字符串 => 无效，返回全量',
+    filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.In, value: '', active: true })],
+    expectedCount: 9,
+  },
+  {
+    name: 'active=true 但 In 为空数组 => 无效，返回全量',
+    filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.In, value: [], active: true })],
+    expectedCount: 9,
+  },
+  {
+    name: 'active=true 且 value=null => 无效，返回全量',
+    filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.Equals, value: null as unknown as string, active: true })],
+    expectedCount: 9,
+  },
+  {
+    name: '组合场景：2 条 active，其中 1 条 value 为空（无效） => 只有有效条件生效',
+    filters: [
+      mkFilter({ fieldName: 'group', operator: FilterOperator.Equals, value: 'A', active: true }),
+      mkFilter({ fieldName: 'day', operator: FilterOperator.GreaterThan, value: '', active: true }),
+    ],
+    expectedCount: 4,
+  },
+  {
+    name: '先空后填：模拟用户从空值输入 \'A\' => 填写值后条件生效，过滤到 4 条',
+    filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.Equals, value: 'A', active: true })],
+    expectedCount: 4,
+  },
+  {
+    name: '先有后清：模拟用户将 \'A\' 清空 => 条件变无效，返回全量',
+    filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.Equals, value: '', active: true })],
+    expectedCount: 9,
+  },
+  {
+    name: '勾选 active=false 手动取消 => 返回全量 (即使 value 已填)',
+    filters: [mkFilter({ fieldName: 'group', operator: FilterOperator.Equals, value: 'A', active: false })],
+    expectedCount: 9,
+  },
 ];
 
 let passed = 0;
 let failed = 0;
+
+// ============== isFilterValid 单元测试 ==============
+const validityCases: Array<{ name: string; filter: Filter; expected: boolean }> = [
+  { name: '空字符串 value => 无效', filter: mkFilter({ fieldName: 'group', value: '' }), expected: false },
+  { name: '全空格 value => 无效', filter: mkFilter({ fieldName: 'group', value: '   ' }), expected: false },
+  { name: 'null value => 无效', filter: mkFilter({ fieldName: 'group', value: null as unknown as string }), expected: false },
+  { name: '空数组 value => 无效', filter: mkFilter({ fieldName: 'group', operator: FilterOperator.In, value: [] }), expected: false },
+  { name: 'Between 只填一个值 => 无效', filter: mkFilter({ fieldName: 'day', operator: FilterOperator.Between, value: '1' }), expected: false },
+  { name: 'Between 两个有效值 => 有效', filter: mkFilter({ fieldName: 'day', operator: FilterOperator.Between, value: '1,3' }), expected: true },
+  { name: 'In 逗号分隔有效值 => 有效', filter: mkFilter({ fieldName: 'group', operator: FilterOperator.In, value: 'A,B' }), expected: true },
+  { name: '普通文本 Equals 有值 => 有效', filter: mkFilter({ fieldName: 'group', value: 'A' }), expected: true },
+  { name: '数值 GreaterThan 有值 => 有效', filter: mkFilter({ fieldName: 'day', operator: FilterOperator.GreaterThan, value: '2' }), expected: true },
+];
+
+for (const vc of validityCases) {
+  try {
+    assert.equal(isFilterValid(vc.filter), vc.expected);
+    console.log(`  ✓ [isFilterValid] ${vc.name}`);
+    passed += 1;
+  } catch (err) {
+    console.error(`  ✗ [isFilterValid] ${vc.name}`);
+    console.error(`    ${(err as Error).message}`);
+    failed += 1;
+  }
+}
 
 for (const tc of cases) {
   try {

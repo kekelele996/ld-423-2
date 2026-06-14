@@ -21,6 +21,20 @@ const splitNumericRange = (value: unknown): [number | null, number | null] => {
   return [parseNumericValue(parts[0] ?? null), parseNumericValue(parts[1] ?? null)];
 };
 
+export const isFilterValid = (filter: Filter): boolean => {
+  if (typeof filter.value === 'string' && filter.value.trim() === '') return false;
+  if (Array.isArray(filter.value) && filter.value.length === 0) return false;
+  if (filter.value === null || filter.value === undefined) return false;
+  if (filter.operator === FilterOperator.Between) {
+    const [min, max] = splitNumericRange(filter.value);
+    return min !== null && max !== null;
+  }
+  if (filter.operator === FilterOperator.In) {
+    return splitDelimited(filter.value).length > 0;
+  }
+  return true;
+};
+
 const matchRow = (row: DatasetRow, filter: Filter, columnType: DataType | undefined): boolean => {
   const cell = row[filter.fieldName];
   const isNumericColumn = columnType === DataType.Number;
@@ -82,7 +96,7 @@ export const applyFilters = (
   filters: Filter[],
   columns: ColumnDefinition[],
 ): DatasetRow[] => {
-  const active = filters.filter((filter) => filter.active);
+  const active = filters.filter((filter) => filter.active && isFilterValid(filter));
   if (active.length === 0) return rows;
   const columnMap = new Map(columns.map((column) => [column.name, column.type]));
   return rows.filter((row) => active.every((filter) => matchRow(row, filter, columnMap.get(filter.fieldName))));

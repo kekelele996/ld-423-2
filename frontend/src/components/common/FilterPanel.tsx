@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { DataType, FilterOperator } from '../../types';
 import { useFilterStore } from '../../stores/filterStore';
 import { useDatasetStore } from '../../stores/datasetStore';
+import { isFilterValid } from '../../utils/filterUtils';
 
 interface FilterPanelProps {
   datasetId: string;
@@ -46,7 +47,11 @@ export const FilterPanel = ({ datasetId }: FilterPanelProps) => {
           <input
             value={String(filter.value)}
             type={dataset.columns.find((column) => column.name === filter.fieldName)?.type === DataType.Number ? 'number' : 'text'}
-            onChange={(event) => updateFilter({ ...filter, value: event.target.value })}
+            onChange={(event) => {
+              const next = { ...filter, value: event.target.value };
+              next.active = isFilterValid(next);
+              updateFilter(next);
+            }}
           />
           <button type="button" onClick={() => removeFilter(filter.id)}>
             删除

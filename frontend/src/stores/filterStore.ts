@@ -16,7 +16,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set({
       filters: [
         ...get().filters,
-        { id: crypto.randomUUID(), datasetId, fieldName, operator: FilterOperator.Equals, value: '', active: true },
+        { id: crypto.randomUUID(), datasetId, fieldName, operator: FilterOperator.Equals, value: '', active: false },
       ],
     }),
   updateFilter: (filter) => set({ filters: get().filters.map((candidate) => (candidate.id === filter.id ? filter : candidate)) }),
