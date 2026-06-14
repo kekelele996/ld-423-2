@@ -35,6 +35,66 @@ export const isFilterValid = (filter: Filter): boolean => {
   return true;
 };
 
+const NUMERIC_OPERATORS: ReadonlySet<FilterOperator> = new Set([
+  FilterOperator.Equals,
+  FilterOperator.GreaterThan,
+  FilterOperator.LessThan,
+  FilterOperator.Between,
+  FilterOperator.In,
+]);
+
+export const normalizeFilterValue = (filter: Filter, columnType: DataType | undefined): Filter => {
+  let normalized: Filter = { ...filter };
+  const isNumericColumn = columnType === DataType.Number;
+
+  // 数值列 + 明确非数值操作符（如 Contains） => 清空，不兼容
+  if (isNumericColumn && filter.operator === FilterOperator.Contains) {
+    return { ...normalized, value: '', active: false };
+  }
+  // 非数值列 + 纯数值比较操作符（不含 Equals/In，它们在字符串下也有语义） => 清空
+  if (
+    !isNumericColumn &&
+    (filter.operator === FilterOperator.GreaterThan || filter.operator === FilterOperator.LessThan || filter.operator === FilterOperator.Between) &&
+    columnType !== undefined
+  ) {
+    return { ...normalized, value: '', active: false };
+  }
+
+  if (isNumericColumn && NUMERIC_OPERATORS.has(filter.operator)) {
+    switch (filter.operator) {
+      case FilterOperator.Equals:
+      case FilterOperator.GreaterThan:
+      case FilterOperator.LessThan: {
+        if (parseNumericValue(filter.value) === null) {
+          normalized = { ...normalized, value: '', active: false };
+        }
+        break;
+      }
+      case FilterOperator.Between: {
+        const [min, max] = splitNumericRange(filter.value);
+        if (min === null || max === null) {
+          normalized = { ...normalized, value: '', active: false };
+        }
+        break;
+      }
+      case FilterOperator.In: {
+        const items = splitDelimited(filter.value);
+        if (items.length === 0 || items.some((item) => parseNumericValue(item) === null)) {
+          normalized = { ...normalized, value: '', active: false };
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  if (!isFilterValid(normalized)) {
+    normalized = { ...normalized, active: false };
+  }
+  return normalized;
+};
+
 const matchRow = (row: DatasetRow, filter: Filter, columnType: DataType | undefined): boolean => {
   const cell = row[filter.fieldName];
   const isNumericColumn = columnType === DataType.Number;

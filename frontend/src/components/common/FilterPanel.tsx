@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { DataType, FilterOperator } from '../../types';
 import { useFilterStore } from '../../stores/filterStore';
 import { useDatasetStore } from '../../stores/datasetStore';
-import { isFilterValid } from '../../utils/filterUtils';
+import { isFilterValid, normalizeFilterValue } from '../../utils/filterUtils';
 
 interface FilterPanelProps {
   datasetId: string;
@@ -30,14 +30,22 @@ export const FilterPanel = ({ datasetId }: FilterPanelProps) => {
       {filters.map((filter) => (
         <div className="filter-row" key={filter.id}>
           <input type="checkbox" checked={filter.active} onChange={() => toggleFilter(filter.id)} aria-label="启用筛选" />
-          <select value={filter.fieldName} onChange={(event) => updateFilter({ ...filter, fieldName: event.target.value })}>
+          <select value={filter.fieldName} onChange={(event) => {
+            const next = { ...filter, fieldName: event.target.value };
+            const columnType = dataset.columns.find((column) => column.name === event.target.value)?.type;
+            updateFilter(normalizeFilterValue(next, columnType));
+          }}>
             {dataset.columns.map((column) => (
               <option key={column.name} value={column.name}>
                 {column.name}
               </option>
             ))}
           </select>
-          <select value={filter.operator} onChange={(event) => updateFilter({ ...filter, operator: event.target.value as FilterOperator })}>
+          <select value={filter.operator} onChange={(event) => {
+            const next = { ...filter, operator: event.target.value as FilterOperator };
+            const columnType = dataset.columns.find((column) => column.name === filter.fieldName)?.type;
+            updateFilter(normalizeFilterValue(next, columnType));
+          }}>
             {Object.values(FilterOperator).map((operator) => (
               <option key={operator} value={operator}>
                 {operator}
